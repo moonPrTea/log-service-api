@@ -1,12 +1,11 @@
 package dev.moon.logging.ClickhouseLogApi.repository;
 
+import dev.moon.logging.ClickhouseLogApi.dto.EndpointsErrorsRating;
 import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
 import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
 import jakarta.annotation.PostConstruct;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -62,7 +61,6 @@ public class ClickhouseRepository {
   }
 
   public List<LogShortRecord> getLogsByDate(LocalDate date) {
-
     String query = """
             SELECT
                 service, method, endpoint,
@@ -111,6 +109,35 @@ public class ClickhouseRepository {
             logEvent.userId(),
             logEvent.logLevel().name(),
             Timestamp.from(logEvent.createdAt() == null ? Instant.now() : logEvent.createdAt())
+    );
+  }
+
+  public List<EndpointsErrorsRating> getFiveEndpointsErrorsRating(String serviceName) {
+    String query = """
+            select service, endpoint, status_code,
+                   count(*) as count_errors,
+                   avg(response_time_ms) as avg_response_time,
+                   min(created_at) as first_log_date,
+                   max(created_at) as last_log_date
+            from server_logs
+            where service = ?
+            group by service, endpoint, status_code
+            order by count_errors desc
+            limit 5;
+            """;
+
+    return jdbcTemplate.query(
+            query,
+            (record, index) -> new EndpointsErrorsRating(
+                    record.getString("service"),
+                    record.getString("endpoint"),
+                    record.getInt("status_code"),
+                    record.getInt("count_errors"),
+                    record.getDouble("avg_response_time"),
+                    record.getTimestamp("first_log_date").toInstant(),
+                    record.getTimestamp("last_log_date").toInstant()
+            ),
+            serviceName
     );
   }
 }

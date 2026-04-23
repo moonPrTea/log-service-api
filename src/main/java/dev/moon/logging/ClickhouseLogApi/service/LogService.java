@@ -1,5 +1,6 @@
 package dev.moon.logging.ClickhouseLogApi.service;
 
+import dev.moon.logging.ClickhouseLogApi.dto.EndpointsErrorsRating;
 import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
 import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
 import dev.moon.logging.ClickhouseLogApi.repository.ClickhouseRepository;
@@ -29,6 +30,10 @@ public class LogService {
 
   public List<LogShortRecord>  getLogsByDate(LocalDate date) {
     return clickhouseRepository.getLogsByDate(date);
+  }
+
+  public List<EndpointsErrorsRating> getFiveEndpointsErrorsRating(String serviceName) {
+    return clickhouseRepository.getFiveEndpointsErrorsRating(serviceName);
   }
 
 }
