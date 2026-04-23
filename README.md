@@ -20,10 +20,13 @@ Before running the application, configure required properties in
 docker compose up -d
 ```
 
-### 2. Create Kafka topic `logs-topic`
+### 2. (Optional) Create another topic:
+Replace ```<topic-name>``` with chosen name
 ```bash
 docker exec -it log-service-api-kafka-1 /opt/kafka/bin/kafka-topics.sh \
-  --create --topic logs-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+  --create --topic <topic-name> \
+  --bootstrap-server localhost:9092 \
+  --partitions 1 --replication-factor 1
 ```
 
 ### 3. Run the application

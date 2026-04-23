@@ -1,12 +1,15 @@
 package dev.moon.logging.ClickhouseLogApi.kafka;
 
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
@@ -35,6 +38,15 @@ public class KafkaConfig {
   @Bean
   public ConsumerFactory<String, String> consumerFactory() {
     return new DefaultKafkaConsumerFactory<>(consumerProps());
+  }
+
+  @Bean
+  public NewTopic logCreateTopic() {
+    return TopicBuilder.name("test.log-create.1")
+            .partitions(2)
+            .replicas(2)
+            .config(TopicConfig.RETENTION_MS_CONFIG, "172800000") // will be deleted in 2 days
+            .build();
   }
 
   private Map<String, Object> consumerProps() {
