@@ -11,7 +11,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 
 @Configuration
-public class DbConfig {
+public class ClickhouseConfig {
 
   @Bean
   public DataSource setUpConnection(@Value("${db.url}") String dbUrl,

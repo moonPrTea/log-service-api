@@ -1,6 +1,6 @@
 package dev.moon.logging.ClickhouseLogApi.repository;
 
-import dev.moon.logging.ClickhouseLogApi.dto.LogDto;
+import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +12,7 @@ import java.time.Instant;
 
 @Repository
 public class ClickhouseRepository {
-  private static final Logger log = LoggerFactory.getLogger(ClickhouseRepository.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClickhouseRepository.class);
   private final JdbcTemplate jdbcTemplate;
 
   public ClickhouseRepository(JdbcTemplate jdbcTemplate) {
@@ -28,12 +28,12 @@ public class ClickhouseRepository {
                 endpoint String,
                 method String,
                 status_code UInt16,
+                message String,
+                file_source String,
                 response_time_ms UInt32,
                 user_id UInt32,
-                file_source String,
                 log_level String,
-                message String,
-                created_at DateTime('UTC')
+                created_at DateTime64(3, 'UTC')
             )
             ENGINE = MergeTree
             ORDER BY (created_at, service, endpoint)
@@ -42,33 +42,43 @@ public class ClickhouseRepository {
     try {
       jdbcTemplate.execute(query);
     } catch (Exception e) {
-      log.error("Clickhouse server is unavailable", e);
+      LOGGER.error("Clickhouse server is unavailable", e);
     }
   }
 
-  public void createLog(LogDto logDto) {
+  public boolean checkClickhouseAvailability() {
+    try {
+      return jdbcTemplate.queryForObject(
+              "SELECT 5", Integer.class) != null;
+    } catch (Exception exception) {
+      LOGGER.error("Clickhouse is unavailable: ", exception.getMessage());
+      return false;
+    }
+  }
+
+  public void createLog(LogEvent logEvent) {
     String query = """
             INSERT INTO server_logs (
             service, endpoint, method,
-            status_code, response_time_ms, 
-            user_id, file_source,
-            log_level, message, created_at
+            status_code, message, file_source,
+            response_time_ms, user_id,
+            log_level, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     jdbcTemplate.update(
             query,
-            logDto.serviceName(),
-            logDto.endpoint(),
-            logDto.httpMethod().name(),
-            logDto.statusCode(),
-            logDto.responseTimeMs(),
-            logDto.userId(),
-            logDto.fileSource(),
-            logDto.logLevel().name(),
-            logDto.message(),
-            Timestamp.from(logDto.createdAt() == null ? Instant.now() : logDto.createdAt())
+            logEvent.serviceName(),
+            logEvent.endpoint(),
+            logEvent.httpMethod().name(),
+            logEvent.statusCode(),
+            logEvent.message(),
+            logEvent.fileSource(),
+            logEvent.responseTimeMs(),
+            logEvent.userId(),
+            logEvent.logLevel().name(),
+            Timestamp.from(logEvent.createdAt() == null ? Instant.now() : logEvent.createdAt())
     );
   }
 }

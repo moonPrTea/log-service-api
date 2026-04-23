@@ -1,7 +1,7 @@
 package dev.moon.logging.ClickhouseLogApi.resource;
 
 import dev.moon.logging.ClickhouseLogApi.dto.BaseAnswer;
-import dev.moon.logging.ClickhouseLogApi.dto.LogDto;
+import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
 import dev.moon.logging.ClickhouseLogApi.repository.ClickhouseRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,7 +32,7 @@ public class LogResource {
   }
 
   @PostMapping
-  public ResponseEntity<BaseAnswer> createLogRecord(@Valid @RequestBody LogDto logDto) {
+  public ResponseEntity<BaseAnswer> createLogRecord(@Valid @RequestBody LogEvent logDto) {
     clickhouseRepository.createLog(logDto);
 
     return ResponseEntity
