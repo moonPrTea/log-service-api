@@ -1,14 +1,19 @@
 package dev.moon.logging.ClickhouseLogApi.repository;
 
 import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
+import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
 import jakarta.annotation.PostConstruct;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 @Repository
 public class ClickhouseRepository {
@@ -55,6 +60,33 @@ public class ClickhouseRepository {
       return false;
     }
   }
+
+  public List<LogShortRecord> getLogsByDate(LocalDate date) {
+
+    String query = """
+            SELECT
+                service, method, endpoint,
+                status_code, message,
+                user_id, created_at
+            FROM server_logs
+            WHERE toDate(created_at) = ?
+            """;
+
+    return jdbcTemplate.query(
+            query,
+            (record, index) -> new LogShortRecord(
+                    record.getString("service"),
+                    record.getString("method"),
+                    record.getString("endpoint"),
+                    record.getInt("status_code"),
+                    record.getInt("user_id"),
+                    record.getString("message"),
+                    record.getTimestamp("created_at").toInstant()
+            ),
+            date
+    );
+  }
+
 
   public void createLog(LogEvent logEvent) {
     String query = """
