@@ -3,33 +3,22 @@ package dev.moon.logging.ClickhouseLogApi.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import javax.sql.DataSource;
-
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import com.clickhouse.client.api.Client;
 
 
 @Configuration
 public class ClickhouseConfig {
 
-  @Bean
-  public DataSource setUpConnection(@Value("${db.url}") String dbUrl,
-                                    @Value("${db.user}") String dbUser,
-                                    @Value("${db.password}") String dbPassword) {
-    DriverManagerDataSource driverManager = new DriverManagerDataSource();
-    driverManager.setDriverClassName("com.clickhouse.jdbc.ClickHouseDriver");
-
-    driverManager.setUrl(dbUrl);
-    driverManager.setUsername(dbUser);
-    driverManager.setPassword(dbPassword);
-
-    return driverManager;
+  @Bean Client createClient(@Value("${db.url}") String dbUrl,
+                            @Value("${db.user}") String dbUser,
+                            @Value("${db.password}") String dbPassword) {
+    return new Client
+            .Builder().addEndpoint(dbUrl)
+            .setUsername(dbUser)
+            .setPassword(dbPassword)
+            .setMaxConnections(50)
+            .setSocketRcvbuf(500_000)
+            .setSocketTcpNodelay(true)
+            .build();
   }
-
-  @Bean
-  public JdbcTemplate jdbcTemplate(DataSource dataSource) {
-    return new JdbcTemplate(dataSource);
-  }
-
 }

@@ -7,7 +7,8 @@ import jakarta.validation.constraints.Null;
 import java.time.Instant;
 
 public record LogEvent(
-        @NotNull(message = "Service name is a required field") String serviceName,
+        @NotNull(message = "Service name is a required field")
+        String serviceName,
         String endpoint,
         HttpMethod httpMethod,
         Integer statusCode,

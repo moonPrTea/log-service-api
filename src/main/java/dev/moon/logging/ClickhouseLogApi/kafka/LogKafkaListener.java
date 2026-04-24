@@ -38,7 +38,7 @@ public class LogKafkaListener {
 
       LOGGER.info("Kafka message saved to ClickHouse");
     } catch (Exception e) {
-      LOGGER.warn("An error occurred: {}", e.getMessage());
+      LOGGER.warn("Kafka message processing failed. Message, error {}", value, e);
       ack.acknowledge();
     }
   }

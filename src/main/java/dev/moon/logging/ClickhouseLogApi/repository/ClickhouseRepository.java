@@ -1,27 +1,26 @@
 package dev.moon.logging.ClickhouseLogApi.repository;
 
-import dev.moon.logging.ClickhouseLogApi.dto.EndpointsErrorsRating;
+import com.clickhouse.client.api.Client;
+import com.clickhouse.client.api.query.QueryResponse;
 import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
-import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Repository
 public class ClickhouseRepository {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClickhouseRepository.class);
-  private final JdbcTemplate jdbcTemplate;
 
-  public ClickhouseRepository(JdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
-  }
+  @Autowired
+  Client client;
 
   @PostConstruct
   public void initTable() {
@@ -43,50 +42,38 @@ public class ClickhouseRepository {
             ORDER BY (created_at, service, endpoint)
             """;
 
-    try {
-      jdbcTemplate.execute(query);
+    try (QueryResponse response = client.query(query).join()){
     } catch (Exception e) {
-      LOGGER.error("Clickhouse server is unavailable", e);
+      LOGGER.error("Create table operation didn't execute: ", e);
     }
   }
 
   public boolean checkClickhouseAvailability() {
-    try {
-      return jdbcTemplate.queryForObject(
-              "SELECT 5", Integer.class) != null;
+    try (QueryResponse response = client.query("SELECT 5").get()) {
+      return true;
     } catch (Exception exception) {
       LOGGER.error("Clickhouse is unavailable: ", exception.getMessage());
       return false;
     }
   }
 
-  public List<LogShortRecord> getLogsByDate(LocalDate date) {
+  public CompletableFuture<QueryResponse> getLogsByDate(LocalDate date) {
     String query = """
             SELECT
                 service, method, endpoint,
-                status_code, message,
-                user_id, created_at
+                status_code as statusCode, message,
+                user_id as userId, created_at as createdAt
             FROM server_logs
-            WHERE toDate(created_at) = ?
+            WHERE toDate(created_at) = {createdAt:Date}
+            FORMAT JSONEachRow
             """;
+    Map<String, Object> queryParams = Map.of("createdAt", date);
 
-    return jdbcTemplate.query(
-            query,
-            (record, index) -> new LogShortRecord(
-                    record.getString("service"),
-                    record.getString("method"),
-                    record.getString("endpoint"),
-                    record.getInt("status_code"),
-                    record.getInt("user_id"),
-                    record.getString("message"),
-                    record.getTimestamp("created_at").toInstant()
-            ),
-            date
-    );
+    return client.query(query, queryParams);
   }
 
 
-  public void createLog(LogEvent logEvent) {
+  public boolean createLog(LogEvent logEvent) {
     String query = """
             INSERT INTO server_logs (
             service, endpoint, method,
@@ -94,50 +81,55 @@ public class ClickhouseRepository {
             response_time_ms, user_id,
             log_level, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+            {service:String}, {endpoint:String},
+            {method:String}, {statusCode:Integer},
+            {message:String}, {fileSource: String},
+            {responseTimeMs:Double}, {userId:Integer},
+            {logLevel:String}, {createdAt:DateTime(3)}
+            )
             """;
 
-    jdbcTemplate.update(
-            query,
-            logEvent.serviceName(),
-            logEvent.endpoint(),
-            logEvent.httpMethod().name(),
-            logEvent.statusCode(),
-            logEvent.message(),
-            logEvent.fileSource(),
-            logEvent.responseTimeMs(),
-            logEvent.userId(),
-            logEvent.logLevel().name(),
-            Timestamp.from(logEvent.createdAt() == null ? Instant.now() : logEvent.createdAt())
-    );
+    Map<String, Object> queryParams = Map.of(
+            "service", logEvent.serviceName(),
+            "endpoint", logEvent.endpoint(),
+            "method", logEvent.httpMethod(),
+            "statusCode", logEvent.statusCode(),
+            "message", logEvent.message(),
+            "fileSource", logEvent.fileSource(),
+            "responseTimeMs", logEvent.responseTimeMs(),
+            "userId", logEvent.userId(),
+            "logLevel", logEvent.logLevel(),
+            "createdAt", Timestamp.from(logEvent.createdAt() == null ? Instant.now() : logEvent.createdAt())
+            );
+
+    try (QueryResponse response = client.query(query, queryParams).get()) {
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Insert into server_logs operation didn't execute: ", e);
+      return false;
+    }
   }
 
-  public List<EndpointsErrorsRating> getFiveEndpointsErrorsRating(String serviceName) {
+  public CompletableFuture<QueryResponse> getFiveEndpointsErrorsRating(String serviceName) {
     String query = """
-            select service, endpoint, status_code,
-                   count(*) as count_errors,
-                   avg(response_time_ms) as avg_response_time,
-                   min(created_at) as first_log_date,
-                   max(created_at) as last_log_date
+            select service, endpoint, status_code as statusCode,
+                   count(*) as countErrors,
+                   avg(response_time_ms) as avgResponseMs,
+                   min(created_at) as firstLogDate,
+                   max(created_at) as lastLogDate
             from server_logs
-            where service = ?
+            where service = {serviceName:String}
             group by service, endpoint, status_code
-            order by count_errors desc
-            limit 5;
+            order by countErrors desc
+            limit 5
+            FORMAT JSONEachRow
             """;
+    Map<String, Object> queryParams = Map.of("serviceName", serviceName);
 
-    return jdbcTemplate.query(
+    return client.query(
             query,
-            (record, index) -> new EndpointsErrorsRating(
-                    record.getString("service"),
-                    record.getString("endpoint"),
-                    record.getInt("status_code"),
-                    record.getInt("count_errors"),
-                    record.getDouble("avg_response_time"),
-                    record.getTimestamp("first_log_date").toInstant(),
-                    record.getTimestamp("last_log_date").toInstant()
-            ),
-            serviceName
+            queryParams
     );
   }
 }
