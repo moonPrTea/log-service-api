@@ -13,6 +13,9 @@ import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.DeliveryAttemptAwareRetryListener;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,11 +30,20 @@ public class KafkaConfig {
   private String groupId;
 
   @Bean
-  ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(ConsumerFactory<String, String> consumerFactory) {
+  ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
+          ConsumerFactory<String, String> consumerFactory) {
+
     ConcurrentKafkaListenerContainerFactory<String, String> factory =
             new ConcurrentKafkaListenerContainerFactory<>();
     factory.setConsumerFactory(consumerFactory);
     factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+    final FixedBackOff fixedBackOff = new FixedBackOff(1, 3);
+    final DefaultErrorHandler errorHandler = new DefaultErrorHandler(fixedBackOff);
+    errorHandler.setRetryListeners(new DeliveryAttemptAwareRetryListener());
+
+    factory.setCommonErrorHandler(errorHandler);
+
     return factory;
   }
 

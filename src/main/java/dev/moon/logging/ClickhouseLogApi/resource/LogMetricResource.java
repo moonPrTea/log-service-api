@@ -36,8 +36,16 @@ public class LogMetricResource {
   @GetMapping("/rating_endpoints_errors")
   public ResponseEntity<?> getEndpointsRatingByErrors(@RequestParam(name = "service", required = true) String serviceName) {
     return ResponseEntity
-            .status(HttpStatus.OK)
+            .ok()
             .body(Map.of("rating-endpoints", logService.getFiveEndpointsErrorsRating(serviceName)));
+  }
+
+  @GetMapping("/errors_intervals")
+  public ResponseEntity<?> getErrorsServiceIntervals(@RequestParam(name = "service", required = true) String serviceName) {
+    return ResponseEntity
+            .ok()
+            .body(Map.of("service", serviceName,
+                    "errors_intervals", logService.getServiceErrorIntervals(serviceName)));
   }
 
 }

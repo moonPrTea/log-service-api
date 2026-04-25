@@ -4,6 +4,7 @@ import com.clickhouse.client.api.query.QueryResponse;
 import dev.moon.logging.ClickhouseLogApi.dto.EndpointsErrorsRating;
 import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
 import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
+import dev.moon.logging.ClickhouseLogApi.dto.ServiceErrorIntervals;
 import dev.moon.logging.ClickhouseLogApi.repository.ClickhouseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,27 @@ public class LogService {
 
     } catch (Exception exception) {
       LOGGER.error("Exception in getFiveEndpointsErrorsRating: ", exception);
+      return Collections.emptyList();
+    }
+  }
+
+  public LogShortRecord getLastCreatedServiceLog() {
+    try (QueryResponse lastCreatedLog = clickhouseRepository.getLastCreatedServiceLog().join()) {
+      return new ObjectMapper()
+              .readValue(lastCreatedLog.getInputStream(), LogShortRecord.class);
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getLastCreatedServiceLog: ", exception);
+      return null;
+    }
+  }
+
+  public List<ServiceErrorIntervals> getServiceErrorIntervals(String serviceName) {
+    try (QueryResponse serviceErrorIntervals = clickhouseRepository.getServiceErrorIntervals(serviceName).join()) {
+      return new ObjectMapper().readerFor(ServiceErrorIntervals.class)
+              .<ServiceErrorIntervals>readValues(serviceErrorIntervals.getInputStream())
+              .readAll();
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getServiceErrorIntervals: ", exception);
       return Collections.emptyList();
     }
   }

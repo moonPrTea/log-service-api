@@ -132,4 +132,50 @@ public class ClickhouseRepository {
             queryParams
     );
   }
+
+  public CompletableFuture<QueryResponse> getLastCreatedServiceLog() {
+    String query = """
+            SELECT
+                service, method, endpoint,
+                status_code as statusCode, message,
+                user_id as userId, created_at as createdAt
+            FROM server_logs
+            order by created_at desc
+            limit 1
+            FORMAT JSONEachRow;
+            """;
+
+    return client.query(query);
+  }
+
+  public CompletableFuture<QueryResponse> getServiceErrorIntervals(String serviceName) {
+    String query = """
+            with interval_stats as (
+                select
+                    toStartOfInterval(created_at, interval 15 minute) as timeInterval,
+                    concat(toString(intDiv(status_code, 100)), 'xx') as statusCodeGroup,
+                    count(*) as countErrors, round(avg(response_time_ms), 2) as avgResponseTime,
+                    min(created_at) as firstErrorTime, max(created_at) as lastErrorTime,
+                    arraySort(groupUniqArray(status_code)) as intervalStatusCodes,
+                    topK(3)(endpoint) as highestErrorEndpoint
+                from server_logs
+                where (status_code between 400 and 599)
+                and (service = {serviceName:String})
+                group by timeInterval, statusCodeGroup
+            )
+            select
+                timeInterval, statusCodeGroup,
+                highestErrorEndpoint, countErrors, intervalStatusCodes,
+                concat(round(100.0 * countErrors / sum(countErrors) over (partition by timeInterval), 2), '%') as percentErrorsInInterval,
+                avgResponseTime, firstErrorTime,
+                lastErrorTime
+            from interval_stats
+            order by timeInterval, statusCodeGroup desc
+            FORMAT JSONEachRow
+            """;
+
+    Map<String, Object> queryParams = Map.of("serviceName", serviceName);
+
+    return client.query(query, queryParams);
+  }
 }

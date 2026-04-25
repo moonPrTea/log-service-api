@@ -23,4 +23,11 @@ public class LogResource {
             .status(HttpStatus.OK)
             .body(Map.of("logs", logService.getLogsByDate(logsDate)));
   }
+
+  @GetMapping("/last_created_log")
+  public ResponseEntity<?> getLastCreatedServiceLog() {
+    return ResponseEntity
+            .ok()
+            .body(Map.of("last_created_log", logService.getLastCreatedServiceLog()));
+  }
 }

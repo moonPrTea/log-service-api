@@ -42,6 +42,18 @@ printf '%s\n' '{"serviceName":"logs-api","endpoint":"/logs","httpMethod":"POST",
 --topic test.log-create.1 --bootstrap-server localhost:9092
 ```
 
+```bash
+printf '%s\n' '{"serviceName":"logs-api","endpoint":"/logs/stats","httpMethod":"GET","statusCode":500,"responseTimeMs":42,"fileSource":"LogResource.java","userId":11,"logLevel":"WARNING","message":"DB::Exception: Timeout exceeded: elapsed 30.001 seconds","createdAt":"2026-04-21T18:25:20Z"}' \
+| docker exec -i log-service-api-kafka-1 /opt/kafka/bin/kafka-console-producer.sh \
+--topic test.log-create.1 --bootstrap-server localhost:9092
+```
+
+```bash
+printf '%s\n' '{"serviceName":"logs-api","endpoint":"/logs","httpMethod":"DELETE","statusCode":500,"responseTimeMs":10,"fileSource":"LogResource.java","userId":11,"logLevel":"WARNING","message":"Code: 38, DB::Exception: Cannot parse date","createdAt":"2026-04-23T13:25:20Z"}' \
+| docker exec -i log-service-api-kafka-1 /opt/kafka/bin/kafka-console-producer.sh \
+--topic test.log-create.1 --bootstrap-server localhost:9092
+```
+
 ### 5. Verify that sent record was written to ClickHouse `server_logs` table
 ```bash
 docker exec -it clickhouse clickhouse-client \
