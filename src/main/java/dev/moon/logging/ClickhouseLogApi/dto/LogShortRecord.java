@@ -5,6 +5,8 @@ public record LogShortRecord(
         String method,
         String endpoint,
         Integer statusCode,
+        Double responseTimeMs,
+        String fileSource,
         int userId,
         String message,
         String createdAt

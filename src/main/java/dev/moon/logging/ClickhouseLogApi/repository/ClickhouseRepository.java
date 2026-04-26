@@ -39,7 +39,7 @@ public class ClickhouseRepository {
                 created_at DateTime64(3, 'UTC')
             )
             ENGINE = MergeTree
-            ORDER BY (created_at, service, endpoint)
+            ORDER BY (created_at desc, service, endpoint)
             """;
 
     try (QueryResponse response = client.query(query).join()){
@@ -61,6 +61,8 @@ public class ClickhouseRepository {
     String query = """
             SELECT
                 service, method, endpoint,
+                file_source as fileSource,
+                response_time_ms as responseTimeMs,
                 status_code as statusCode, message,
                 user_id as userId, created_at as createdAt
             FROM server_logs
@@ -137,10 +139,10 @@ public class ClickhouseRepository {
     String query = """
             SELECT
                 service, method, endpoint,
+                file_source as fileSource, response_time_ms as responseTimeMs,
                 status_code as statusCode, message,
                 user_id as userId, created_at as createdAt
             FROM server_logs
-            order by created_at desc
             limit 1
             FORMAT JSONEachRow;
             """;
@@ -177,5 +179,111 @@ public class ClickhouseRepository {
     Map<String, Object> queryParams = Map.of("serviceName", serviceName);
 
     return client.query(query, queryParams);
+  }
+
+  public CompletableFuture<QueryResponse> getHighestErrorEndpoint(String serviceName) {
+    StringBuilder query = new StringBuilder("""
+            select
+                service,
+                endpoint,
+                count(*) AS countErrors,
+                min(created_at) as firstErrorTime,
+                max(created_at) as lastErrorTime
+            from server_logs
+            where status_code >= 500 and
+            ({serviceName:String} = '' OR service = {serviceName:String})
+            group BY service, endpoint
+            order by countErrors desc
+            limit 1
+            FORMAT JSONEachRow;
+            """
+    );
+
+    Map<String, Object> queryParams = Map.of("serviceName", (serviceName == null) ? "" : serviceName);
+
+    return client.query(query.toString(), queryParams);
+  }
+
+  public CompletableFuture<QueryResponse> getMostFailingUserEndpoint(String serviceName) {
+    String query = """
+            with most_error_user as (
+                select user_id
+                from server_logs
+                group by user_id
+                order by count(*) desc
+                limit 1
+            )
+            select
+                service,
+                server_logs.user_id as userId,
+                server_logs.endpoint,
+                count(*) as countErrors
+            from server_logs
+            inner join most_error_user on server_logs.user_id = most_error_user.user_id
+            where service = {serviceName:String}
+            group by server_logs.user_id, service, server_logs.endpoint
+            order by countErrors desc
+            FORMAT JSONEachRow;
+            """;
+
+    Map<String, Object> queryParams = Map.of("serviceName", serviceName);
+
+    return client.query(query, queryParams);
+  }
+
+  public CompletableFuture<QueryResponse> checkLogsByResponseTime(Integer responseTimeMs) {
+    String query = """
+            select
+                service, method, endpoint,
+                status_code as statusCode, message,
+                response_time_ms as responseTimeMs, file_source as fileSource,
+                user_id as userId, message, created_at as createdAt
+            from server_logs
+            where response_time_ms > {responseTime:UInt32}
+            FORMAT JSONEachRow;
+            """;
+
+    Map<String, Object> queryParams = Map.of("responseTime", responseTimeMs);
+
+    return client.query(query.toString(), queryParams);
+  }
+
+  public CompletableFuture<QueryResponse> getStatusCodeStats(Integer statusCode, String serviceName) {
+    String query = """
+            select
+                service, status_code as statusCode, count(*) as statusCodeErrors,
+                round(avg(response_time_ms), 2) as avgResponseTime,
+                arraySort(groupUniqArray(endpoint)) as endpoints,
+                arraySort(groupUniqArray(user_id)) as userIds
+            from server_logs
+            where status_code = {statusCode:Integer} and service = {serviceName:String}
+            group by service, status_code
+            FORMAT JSONEachRow;
+            """;
+
+    Map<String, Object> queryParams = Map.of(
+            "statusCode", statusCode,
+            "serviceName", serviceName
+            );
+
+    return client.query(query.toString(), queryParams);
+  }
+
+  public CompletableFuture<QueryResponse> getMostErrorFileSource(String serviceName) {
+    String query = """
+            select file_source, count(*) countFileErrors,
+                   arraySort(groupUniqArray(endpoint)) as endpoints,
+                   round(avg(response_time_ms), 2) as avgResponseTime,
+                   countIf(status_code >= 500) AS count500errors,
+                   uniqExact(user_id) AS uniqueUsers
+            from server_logs
+            where ({serviceName:String} = '' OR service = {serviceName:String})
+            group by file_source
+            FORMAT JSONEachRow;
+            """;
+
+    Map<String, Object> queryParams = Map.of("serviceName", (serviceName == null) ? "" : serviceName);
+
+    return client.query(query.toString(), queryParams);
   }
 }

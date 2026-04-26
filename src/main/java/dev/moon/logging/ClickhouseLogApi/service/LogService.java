@@ -1,10 +1,7 @@
 package dev.moon.logging.ClickhouseLogApi.service;
 
 import com.clickhouse.client.api.query.QueryResponse;
-import dev.moon.logging.ClickhouseLogApi.dto.EndpointsErrorsRating;
-import dev.moon.logging.ClickhouseLogApi.dto.LogEvent;
-import dev.moon.logging.ClickhouseLogApi.dto.LogShortRecord;
-import dev.moon.logging.ClickhouseLogApi.dto.ServiceErrorIntervals;
+import dev.moon.logging.ClickhouseLogApi.dto.*;
 import dev.moon.logging.ClickhouseLogApi.repository.ClickhouseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,5 +77,63 @@ public class LogService {
       return Collections.emptyList();
     }
   }
+
+  public HighestErrorsEndpoint getHighestErrorsEndpoint(String serviceName) {
+    try (QueryResponse highestErrorsEndpoint = clickhouseRepository.getHighestErrorEndpoint(serviceName).join()) {
+       var result = new ObjectMapper().readerFor(HighestErrorsEndpoint.class)
+              .<HighestErrorsEndpoint>readValues(highestErrorsEndpoint.getInputStream());
+
+       return result.hasNextValue() ? result.nextValue() : null;
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getHighestErrorEndpoint: ", exception);
+      return null;
+    }
+  }
+
+  public List<MostFailingUserEndpoint> getMostFailingUserEndpoint(String serviceName) {
+    try (QueryResponse mostFailingUserEndpoint = clickhouseRepository.getMostFailingUserEndpoint(serviceName).join()) {
+      return new ObjectMapper()
+              .readerFor(MostFailingUserEndpoint.class)
+              .<MostFailingUserEndpoint>readValues(mostFailingUserEndpoint.getInputStream()).readAll();
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getMostFailingUserEndpoint: ", exception);
+      return null;
+    }
+  }
+
+  public List<LogShortRecord> checkLogsByResponseTime(Integer responseTime) {
+    try (QueryResponse responses = clickhouseRepository.checkLogsByResponseTime(responseTime).join()) {
+      return new ObjectMapper()
+              .readerFor(LogShortRecord.class)
+              .<LogShortRecord>readValues(responses.getInputStream()).readAll();
+    } catch (Exception exception) {
+      LOGGER.error("Exception in checkResponsesByResponseTime: ", exception);
+      return null;
+    }
+  }
+
+  public List<ServiceStatusCodeStats> getStatusCodeStats(Integer statusCode, String serviceName) {
+    try (QueryResponse responses = clickhouseRepository.getStatusCodeStats(statusCode, serviceName).join()) {
+      return new ObjectMapper()
+              .readerFor(ServiceStatusCodeStats.class)
+              .<ServiceStatusCodeStats>readValues(responses.getInputStream()).readAll();
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getStatusCodeStats: ", exception);
+      return null;
+    }
+  }
+
+  public List<FileSourceErrorsStats> getMostErrorFileSource(String serviceName) {
+    try (QueryResponse responses = clickhouseRepository.getMostErrorFileSource(serviceName).join()) {
+      return new ObjectMapper()
+              .readerFor(FileSourceErrorsStats.class)
+              .<FileSourceErrorsStats>readValues(responses.getInputStream()).readAll();
+    } catch (Exception exception) {
+      LOGGER.error("Exception in getMostErrorFileSource: ", exception);
+      return null;
+    }
+  }
+
+
 
 }
