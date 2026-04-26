@@ -271,7 +271,7 @@ public class ClickhouseRepository {
 
   public CompletableFuture<QueryResponse> getMostErrorFileSource(String serviceName) {
     String query = """
-            select file_source, count(*) countFileErrors,
+            select file_source as fileSource, count(*) countFileErrors,
                    arraySort(groupUniqArray(endpoint)) as endpoints,
                    round(avg(response_time_ms), 2) as avgResponseTime,
                    countIf(status_code >= 500) AS count500errors,

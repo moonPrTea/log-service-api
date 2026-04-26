@@ -72,14 +72,20 @@ docker exec -it clickhouse clickhouse-client \
 
 ### Metrics routes (`/log/stats`)
 
-| Method | Route | Query params               | Description                                                  |
-|---|---|----------------------------|--------------------------------------------------------------|
-| `GET` | `/log/stats/status` | —                          | Health check for ClickHouse availability                     |
-| `GET` | `/log/stats/rating_endpoints_errors` | `service` (required param) | top endpoints with the highest number of errors for a service |
-| `GET` | `/log/stats/errors_intervals` | `service` (required param) | error statistics grouped by time intervals for a service     |
+
+| Method | Route                              | Query params                             | Description                                           |
+| ------ | ---------------------------------- |------------------------------------------|-------------------------------------------------------|
+| `GET`    | `/log/stats/status`                  | —                                        | health check for ClickHouse availability              |
+| `GET`    | `/log/stats/rating_endpoints_errors` | `service` (required)                      | top endpoints with the highest number of errors       |
+| `GET`    | `/log/stats/errors_intervals`        | `service` (required)                        | error statistics grouped by time intervals            |
+| `GET`    | `/log/stats/highest_error_endpoint`  | `service` (optional)                       | endpoint with the highest number of errors            |
+| `GET`    | `/log/stats/most_failing_user`       | `service` (required)                       | user with the most failed requests                    |
+| `GET`    | `/log/stats/check_response_time`     | `response_time` (required)                 | logs with response time more than given response_time |
+| `GET`    | `/log/stats/status_code_stats`       | `service` (required), `status_code` (required) | stats for specific status code (300–500)              |
+| `GET`    | `/log/stats/most_failed_file`        | `service` (required)                       | file with the highest number of errors                |
 
 ### Request Examples 
-1. Check Clickhouse status (`/log/stats/status`)
+1. Check ClickHouse status (`/log/stats/status`)
 ```bash
 curl -sS "http://localhost:8080/log/stats/status"
 ```
@@ -102,4 +108,29 @@ curl -sS "http://localhost:8080/log/?date=2026-04-21"
 5. Get last created log (`/log/last_created_log`)
 ```bash
 curl -sS "http://localhost:8080/log/last_created_log"
+```
+
+6. Get endpoint with the highest number of errors (`/log/stats/highest_error_endpoint`)
+```bash
+curl -sS "http://localhost:8080/log/stats/highest_error_endpoint?service=logs-api"
+```
+
+7. Get user with the most failed requests (`/log/stats/most_failing_user`)
+```bash
+curl -sS "http://localhost:8080/log/stats/most_failing_user?service=logs-api"
+```
+
+8. Get logs with response time more than given 40ms (`/log/stats/check_response_time`)
+```bash
+curl -sS "http://localhost:8080/log/stats/check_response_time?response_time=40"
+```
+
+9. Get stats for 500 status code(`/log/stats/status_code_stats`)
+```bash
+curl -sS "http://localhost:8080/log/stats/status_code_stats?service=logs-api&status_code=500"
+```
+
+10. Get file with the highest number of errors (`/log/stats/most_failed_file`)
+```bash
+curl -sS "http://localhost:8080/log/stats/most_failed_file?service=logs-api"
 ```
